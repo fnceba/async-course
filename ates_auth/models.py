@@ -1,6 +1,13 @@
 from hashlib import md5
+import json
 from django.db import models
 from cryptography.fernet import Fernet
+import pika
+
+connection = pika.BlockingConnection(
+    pika.ConnectionParameters(host='localhost'))
+channel = connection.channel()
+channel.queue_declare(queue='default')
 
 fernet = Fernet(b'fnEzdP1WtdWv1MtigCnDMHKod-EzumbYM8R2Izz6gyA=')
 
@@ -29,13 +36,23 @@ class User(models.Model):
 
     @staticmethod
     def create_user(role, email:str, password:str, name:str='') -> 'User':
-        user = User.objects.create(role=role, name=name, email=email, password = md5(password).hexdigest())
-        # TODO: send CUD event
+        kwargs = dict(role=role, name=name, email=email, password_md5 = md5(password).hexdigest())
+        user = User.objects.create(**kwargs)
+        
+        #-----------------------------CUD event--------------------------------
+        kwargs.pop('password_md5')
+        kwargs['id'] = user.id
+        channel.basic_publish(
+            exchange='', 
+            routing_key='default', 
+            body=json.dumps(dict(event_type='CUD', content_type='User', action='create', kwargs=kwargs)))
+        #----------------------------------------------------------------------
+
         return user
 
     @staticmethod
     def get_user_token(email:str, password:str) -> str|None: #authenticate
-        user = User.objects.filter(email=email, password= md5(password).hexdigest()).first()
+        user = User.objects.filter(email=email, password_md5= md5(password).hexdigest()).first()
         if not user:
             return
         return fernet.encrypt(str(user.id).encode()).decode()
