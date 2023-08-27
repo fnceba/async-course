@@ -1,0 +1,11 @@
+{{ request.COOKIES.token }}
+
+{% if request.COOKIES.token or is_authorized %}
+Вы авторизованы!
+{% else %}
+<form method='post'>{% csrf_token %}
+{{ auth_form.as_p }}
+<input type="submit" value="Войти">
+</form>
+{{ warning }}
+{% endif %}
