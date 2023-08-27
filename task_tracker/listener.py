@@ -2,7 +2,7 @@ import json
 import pika
 import threading
 
-from ates_auth.models import User
+from task_tracker.models import User
 
 
 class EventListener(threading.Thread):
@@ -15,7 +15,7 @@ class EventListener(threading.Thread):
         self.channel.basic_consume(queue=queue_name, on_message_callback=self.callback)
         
 
-    def CUD_callback(self, channel, method, properties, body):
+    def streaming_callback(self, channel, method, properties, body):
         content_type_mapping = {
             'User': User
         }
@@ -30,11 +30,12 @@ class EventListener(threading.Thread):
 
     def callback(self, channel, method, properties, body):
         body = json.loads(body)
-        if(body['event_type'] == 'CUD'):
-            self.CUD_callback(channel, method, properties, body)
-        elif(body['event_type'] == 'business_event'):
+        if(body['event_type'] == 'Streaming'):
+            self.streaming_callback(channel, method, properties, body)
+        elif(body['event_type'] == 'Business'):
             self.business_event_callback(channel, method, properties, body)
         channel.basic_ack(delivery_tag=method.delivery_tag)
+        print(f'Callback acknowledged: {method=} {properties=} {body=}')
         
     def run(self):
         self.channel.start_consuming()

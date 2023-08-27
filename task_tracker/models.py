@@ -1,6 +1,14 @@
+import json
 import random
+import uuid
 from django.db import models
 from cryptography.fernet import Fernet
+import pika
+
+connection = pika.BlockingConnection(
+    pika.ConnectionParameters(host='localhost'))
+channel = connection.channel()
+channel.queue_declare(queue='default')
 
 fernet = Fernet(b'fnEzdP1WtdWv1MtigCnDMHKod-EzumbYM8R2Izz6gyA=')
 
@@ -25,6 +33,7 @@ class User(models.Model):
     role = models.PositiveSmallIntegerField("Роль", choices=UserRole.choices)
     name = models.CharField("Имя", max_length=50, blank=True, default='')
     email = models.EmailField('Email', max_length=254, unique=True)
+    public_id = models.UUIDField('Public ID', blank=True, null=True)
 
     def get_user_by_token(self, token):
         return User.objects.get(id=int(fernet.decrypt(token.encode()).decode()))
@@ -39,12 +48,23 @@ class Task(models.Model):
     description = models.TextField('Описание задачи')
     status = models.PositiveSmallIntegerField('Статус задачи', choices=TaskStatus.choices, default=0)
     user = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL, verbose_name='Ответственный за выполнение задачи')
-        
+    public_id = models.UUIDField('Public ID', default=uuid.uuid4, editable=False)
+    
 
     @staticmethod
     def create_task(description):
         task = Task.objects.create(description=description)
-        # TODO: send business event and CUD event
+        # TODO: send business event
+
+        #-----------------------------Streaming event--------------------------------
+        kwargs = {'status': task.status, 'description': task.description, 'public_id':task.public_id}
+        channel.basic_publish(
+            exchange='', 
+            routing_key='default', 
+            body=json.dumps(dict(event_type='Streaming', content_type='Task', action='create', kwargs=kwargs)))
+        #----------------------------------------------------------------------
+
+
         task.reassign()
 
     def reassign(self):
@@ -52,9 +72,26 @@ class Task(models.Model):
         user = random.choice(users)
         self.user = user
         self.save(update_fields='user')
-        # TODO: send business event and CUD event
+
+        #-----------------------------Streaming event--------------------------------
+        kwargs = {'public_id':self.public_id, 'user_public_id':self.user.public_id}
+        channel.basic_publish(
+            exchange='', 
+            routing_key='default', 
+            body=json.dumps(dict(event_type='Streaming', content_type='Task', action='update', kwargs=kwargs)))
+        #----------------------------------------------------------------------
+
+        # TODO: send business event
     
     def complete(self):
         self.status = TaskStatus.DONE
         self.save(update_fields='status')
-        # TODO: send business event and CUD event
+        # TODO: send business event
+
+         #-----------------------------Streaming event--------------------------------
+        kwargs = {'public_id':self.public_id, 'status':self.status}
+        channel.basic_publish(
+            exchange='', 
+            routing_key='default', 
+            body=json.dumps(dict(event_type='Streaming', content_type='Task', action='update', kwargs=kwargs)))
+        #----------------------------------------------------------------------
