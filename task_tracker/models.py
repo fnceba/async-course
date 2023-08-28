@@ -54,7 +54,6 @@ class Task(models.Model):
     @staticmethod
     def create_task(description):
         task = Task.objects.create(description=description)
-        # TODO: send business event
 
         #-----------------------------Streaming event--------------------------------
         kwargs = {'status': task.status, 'description': task.description, 'public_id':task.public_id}
@@ -63,6 +62,12 @@ class Task(models.Model):
             routing_key='default', 
             body=json.dumps(dict(event_type='Streaming', content_type='Task', action='create', kwargs=kwargs)))
         #----------------------------------------------------------------------
+
+        kwargs = {'status': task.status, 'description': task.description, 'public_id':task.public_id}
+        channel.basic_publish(
+            exchange='', 
+            routing_key='default', 
+            body=json.dumps(dict(event_type='Business', content_type='Task', action='create', kwargs=kwargs)))
 
 
         task.reassign()
@@ -81,12 +86,15 @@ class Task(models.Model):
             body=json.dumps(dict(event_type='Streaming', content_type='Task', action='update', kwargs=kwargs)))
         #----------------------------------------------------------------------
 
-        # TODO: send business event
+        kwargs = {'public_id':self.public_id, 'user_public_id':self.user.public_id}
+        channel.basic_publish(
+            exchange='', 
+            routing_key='default', 
+            body=json.dumps(dict(event_type='Business', content_type='Task', action='reassign', kwargs=kwargs)))
     
     def complete(self):
         self.status = TaskStatus.DONE
         self.save(update_fields='status')
-        # TODO: send business event
 
          #-----------------------------Streaming event--------------------------------
         kwargs = {'public_id':self.public_id, 'status':self.status}
@@ -95,3 +103,10 @@ class Task(models.Model):
             routing_key='default', 
             body=json.dumps(dict(event_type='Streaming', content_type='Task', action='update', kwargs=kwargs)))
         #----------------------------------------------------------------------
+
+
+        kwargs = {'public_id':self.public_id,}
+        channel.basic_publish(
+            exchange='', 
+            routing_key='default', 
+            body=json.dumps(dict(event_type='Business', content_type='Task', action='complete', kwargs=kwargs)))
