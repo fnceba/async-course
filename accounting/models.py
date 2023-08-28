@@ -2,6 +2,7 @@ import json
 import random
 import uuid
 from django.db import models
+from django.utils import timezone
 from cryptography.fernet import Fernet
 import pika
 
@@ -57,8 +58,12 @@ class Task(models.Model):
         self.reassign_fee = random.randint(-20, -10)
         self.price = random.randint(20, 40)
         self.save(update_fields=['price', 'reassign_fee'])
+
     def reassigned(self): # business callback
         BalanceChangeLog.create_log(self.user, self.reassign_fee)
+
+    def completed(self): # business callback
+        BalanceChangeLog.create_log(self.user, self.price)
 
 
 class BalanceChangeLog(models.Model):
@@ -97,4 +102,6 @@ class BalanceChangeLog(models.Model):
             routing_key='default', 
             body=json.dumps(dict(event_type='Business', content_type='User', action='balance_updated', kwargs=kwargs)))
 
-    
+    @staticmethod
+    def get_management_salary():
+        return -sum(BalanceChangeLog.objects.filter(dt__date=timezone.today()).values_list('change', flat=True))
