@@ -36,9 +36,14 @@ class User(models.Model):
     email = models.EmailField('Email', max_length=254, unique=True)
     public_id = models.UUIDField('Public ID', blank=True, null=True)
     balance = models.FloatField('Баланс', default=0)
+
     def get_user_by_token(self, token):
         return User.objects.get(id=int(fernet.decrypt(token.encode()).decode()))
-
+    
+    def pay_salary(self): # business callback
+        if self.balance < 0:
+            return
+        BalanceChangeLog.create_log(self.user, self.price, is_salary=True)
 
 
 class TaskStatus(models.IntegerChoices):
@@ -69,12 +74,13 @@ class Task(models.Model):
 class BalanceChangeLog(models.Model):
     dt = models.DateTimeField('Create dt', auto_now_add=False)
     change = models.FloatField('Change')
-    user = models.ForeignKey(User, on_delete=models.SET_NULL, verbose_name='Чей баланс изменился')
+    user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, verbose_name='Чей баланс изменился')
     public_id = models.UUIDField('Public ID', default=uuid.uuid4, editable=False)
+    is_salary = models.BooleanField('Salary?', default=False)
     
     @staticmethod
-    def create_log(user, change):
-        chlog = BalanceChangeLog.objects.create(user=user, change=change)
+    def create_log(user, change, is_salary=False):
+        chlog = BalanceChangeLog.objects.create(user=user, change=change, is_salary=is_salary)
         #-----------------------------Streaming event--------------------------------
         kwargs = {'public_id':chlog.public_id, 'user_public_id':user.public_id, 'change':change}
         channel.basic_publish(
@@ -101,7 +107,15 @@ class BalanceChangeLog(models.Model):
             exchange='', 
             routing_key='default', 
             body=json.dumps(dict(event_type='Business', content_type='User', action='balance_updated', kwargs=kwargs)))
-
+        
+        if is_salary:
+            kwargs.pop('balance')
+            channel.basic_publish(
+                exchange='', 
+                routing_key='default', 
+                body=json.dumps(dict(event_type='Business', content_type='User', action='salary_payed', kwargs=kwargs)))
+            
     @staticmethod
     def get_management_salary():
         return -sum(BalanceChangeLog.objects.filter(dt__date=timezone.today()).values_list('change', flat=True))
+    

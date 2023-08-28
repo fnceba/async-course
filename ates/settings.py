@@ -39,6 +39,8 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'ates_auth',
     'task_tracker',
+    'accounting',
+    'analytics',
 ]
 
 MIDDLEWARE = [
