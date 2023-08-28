@@ -56,14 +56,14 @@ class Task(models.Model):
         task = Task.objects.create(description=description)
 
         #-----------------------------Streaming event--------------------------------
-        kwargs = {'status': task.status, 'description': task.description, 'public_id':task.public_id}
+        kwargs = {'status': task.status, 'description': task.description, 'public_id':task.public_id.hex}
         channel.basic_publish(
             exchange='', 
             routing_key='default', 
             body=json.dumps(dict(event_type='Streaming', content_type='Task', action='create', kwargs=kwargs)))
         #----------------------------------------------------------------------
 
-        kwargs = {'status': task.status, 'description': task.description, 'public_id':task.public_id}
+        kwargs = {'status': task.status, 'description': task.description, 'public_id':task.public_id.hex}
         channel.basic_publish(
             exchange='', 
             routing_key='default', 
@@ -76,17 +76,17 @@ class Task(models.Model):
         users = User.objects.exclude(role__in=[UserRole.ADMIN, UserRole.MANAGER])
         user = random.choice(users)
         self.user = user
-        self.save(update_fields='user')
+        self.save(update_fields=['user'])
 
         #-----------------------------Streaming event--------------------------------
-        kwargs = {'public_id':self.public_id, 'user_public_id':self.user.public_id}
+        kwargs = {'public_id':self.public_id.hex, 'user_public_id':self.user.public_id.hex}
         channel.basic_publish(
             exchange='', 
             routing_key='default', 
             body=json.dumps(dict(event_type='Streaming', content_type='Task', action='update', kwargs=kwargs)))
         #----------------------------------------------------------------------
 
-        kwargs = {'public_id':self.public_id, 'user_public_id':self.user.public_id}
+        kwargs = {'public_id':self.public_id.hex, 'user_public_id':self.user.public_id.hex}
         channel.basic_publish(
             exchange='', 
             routing_key='default', 
@@ -97,7 +97,7 @@ class Task(models.Model):
         self.save(update_fields='status')
 
          #-----------------------------Streaming event--------------------------------
-        kwargs = {'public_id':self.public_id, 'status':self.status}
+        kwargs = {'public_id':self.public_id.hex, 'status':self.status}
         channel.basic_publish(
             exchange='', 
             routing_key='default', 
@@ -105,7 +105,7 @@ class Task(models.Model):
         #----------------------------------------------------------------------
 
 
-        kwargs = {'public_id':self.public_id,}
+        kwargs = {'public_id':self.public_id.hex,}
         channel.basic_publish(
             exchange='', 
             routing_key='default', 

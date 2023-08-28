@@ -1,0 +1,51 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Schema for the event",
+    "type": "object",
+    "properties": {
+    "event_type": {
+        "type": "string"
+    },
+    "content_type": {
+        "type": "string"
+    },
+    "action": {
+        "type": "string"
+    },
+    "kwargs": {
+        "type": "object",
+        "properties": {
+        "role": {
+            "type": "number"
+        },
+        "name": {
+            "type": "string"
+        },
+        "email": {
+            "type": "string"
+        },
+        "public_id": {
+            "type": "string"
+        },
+        "status": {
+            "type": "number"
+        },
+        "description": {
+            "type": "string"
+        },
+        "user_public_id": {
+            "type": "string"
+        }
+        },
+        "required": [
+        "public_id"
+        ]
+    }
+    },
+    "required": [
+    "event_type",
+    "content_type",
+    "action",
+    "kwargs"
+    ]
+  }
